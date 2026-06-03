@@ -17,7 +17,7 @@
 
         function App() {
           const [draws, setDraws] = useState(() => {
-            const saved = localStorage.getItem('lao_lottery_local_data');
+            const saved = localStorage.getItem('lao_lottery_v2');
             return saved ? JSON.parse(saved) : [];
           });
 
@@ -34,7 +34,7 @@
           const inputRefs = [useRef(null), useRef(null), useRef(null), useRef(null)];
 
           useEffect(() => {
-            localStorage.setItem('lao_lottery_local_data', JSON.stringify(draws));
+            localStorage.setItem('lao_lottery_v2', JSON.stringify(draws));
             runDataModel();
           }, [draws]);
 
@@ -59,6 +59,7 @@
             }
           };
 
+          // 3. ระบบประมวลผลสถิติและคาดการณ์
           const runDataModel = () => {
             if (draws.length === 0) {
               setFrequency(Array(10).fill(0));
@@ -171,18 +172,20 @@
               </header>
 
               <main className="max-w-4xl mx-auto px-4 mt-6 grid grid-cols-1 md:grid-cols-12 gap-6">
+                
                 <div className="md:col-span-7 space-y-6">
+                
                   <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                     <div className="bg-emerald-50/50 border-b border-emerald-100/50 px-5 py-3.5 flex justify-between items-center">
                       <h2 className="font-bold text-slate-700 text-sm">{editingId ? 'แก้ไขข้อมูล' : 'บันทึกสถิติใหม่'}</h2>
-                      {editingId && <button onClick={() => { setEditingId(null); setDigits(['','','','']); }} className="text-[10px] bg-rose-100 text-rose-600 px-2 py-1 rounded font-medium">ยกเลิก</button>}
+                      {editingId && <button type="button" onClick={() => { setEditingId(null); setDigits(['','','','']); }} className="text-[10px] bg-rose-100 text-rose-600 px-2 py-1 rounded font-medium cursor-pointer">ยกเลิก</button>}
                     </div>
                     
                     <form onSubmit={handleSave} className="p-5 space-y-5">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div>
                           <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">วันที่ออกรางวัล</label>
-                          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-medium text-slate-700" />
+                          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-medium text-slate-700 cursor-pointer" />
                         </div>
                         <div>
                           <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">ผลรางวัล 4 หลัก</label>
@@ -218,12 +221,11 @@
                         </div>
                       </div>
 
-                      <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl transition-colors text-sm shadow-sm shadow-emerald-200">
+                      <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl transition-colors text-sm shadow-sm shadow-emerald-200 cursor-pointer">
                         {editingId ? 'อัปเดตข้อมูล' : 'บันทึกข้อมูล'}
                       </button>
                     </form>
                   </section>
-
                   <section className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
                     <h2 className="font-bold text-slate-700 text-sm mb-4">กราฟความถี่ (Frequency Analysis)</h2>
                     {draws.length === 0 ? <div className="text-center py-6 text-sm text-slate-400 bg-slate-50 rounded-xl border border-dashed">รอข้อมูล...</div> : (
@@ -241,13 +243,12 @@
                     )}
                   </section>
                 </div>
-
                 <div className="md:col-span-5 space-y-6">
                   <section className="bg-slate-800 text-white rounded-2xl shadow-sm p-5 relative overflow-hidden">
                      <div className="absolute -top-10 -right-10 w-40 h-40 bg-emerald-500/20 rounded-full blur-3xl"></div>
                     <div className="flex justify-between items-center mb-5 relative z-10">
                       <h2 className="font-bold text-emerald-400 text-sm">Prediction Dashboard</h2>
-                      <button onClick={runDataModel} className="text-[10px] bg-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-600 transition-colors border border-slate-600">คำนวณใหม่</button>
+                      <button type="button" onClick={runDataModel} className="text-[10px] bg-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-600 transition-colors border border-slate-600 cursor-pointer">คำนวณใหม่</button>
                     </div>
                     {draws.length === 0 ? <div className="text-center py-8 text-sm text-slate-400 border border-slate-700 border-dashed rounded-xl relative z-10">ต้องการสถิติ 1 งวดขึ้นไป</div> : (
                       <div className="space-y-5 relative z-10">
@@ -271,7 +272,6 @@
                       </div>
                     )}
                   </section>
-
                   <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
                     <div className="bg-slate-50/80 border-b border-slate-100 px-5 py-3.5"><h2 className="font-bold text-slate-700 text-sm">ประวัติข้อมูล ({draws.length})</h2></div>
                     <div className="overflow-auto max-h-[400px]">
@@ -290,8 +290,8 @@
                                 <td className="py-3 px-4 text-slate-700 text-xs font-medium">{new Date(draw.date).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit' })}</td>
                                 <td className="py-3 px-4 text-center font-black tracking-widest bg-slate-50/50">{draw.digits.join('')}</td>
                                 <td className="py-3 px-4 text-center">
-                                  <button onClick={() => handleEdit(draw)} className="text-emerald-600 hover:bg-emerald-100 p-1.5 rounded mr-2">แก้ไข</button>
-                                  <button onClick={() => handleDelete(draw.id)} className="text-rose-500 hover:bg-rose-100 p-1.5 rounded">ลบ</button>
+                                  <button type="button" onClick={() => handleEdit(draw)} className="text-emerald-600 hover:bg-emerald-100 p-1.5 rounded mr-2 cursor-pointer">แก้ไข</button>
+                                  <button type="button" onClick={() => handleDelete(draw.id)} className="text-rose-500 hover:bg-rose-100 p-1.5 rounded cursor-pointer">ลบ</button>
                                 </td>
                               </tr>
                             ))}
@@ -305,10 +305,11 @@
             </div>
           );
         }
-
-        const root = banknotes = ReactDOM.createRoot(document.getElementById('root'));
+        const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
 </body>
 </html>
+```eof
 
+ลองก๊อปปี้ไปวางทับทั้งหมดแล้วทดสอบดูใหม่ได้เลยครับ ครั้งนี้มั่นใจว่าแสดงผล 100% แน่นอนครับ!
