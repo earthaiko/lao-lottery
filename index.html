@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สถิติหวยลาวพัฒนา - Data Analytics</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+          const [draws, setDraws] = useState(() => {
+            const saved = localStorage.getItem('lao_lottery_local_data');
+            return saved ? JSON.parse(saved) : [];
+          });
+
+          const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+          const [digits, setDigits] = useState(['', '', '', '']); 
+          const [editingId, setEditingId] = useState(null);
+          
+          const [frequency, setFrequency] = useState(Array(10).fill(0));
+          const [predictions, setPredictions] = useState({
+            primaryHot: null, secondaryHot: null, coldDigit: null, setsThree: [], setsTwo: []
+          });
+          
+          const [toast, setToast] = useState(null);
+          const inputRefs = [useRef(null), useRef(null), useRef(null), useRef(null)];
+
+          useEffect(() => {
+            localStorage.setItem('lao_lottery_local_data', JSON.stringify(draws));
+            runDataModel();
+          }, [draws]);
+
+          const showToast = (message, type = 'success') => {
+            setToast({ message, type });
+            setTimeout(() => setToast(null), 3000);
+          };
+
+          const handleDigitChange = (index, value) => {
+            const cleanValue = value.replace(/[^0-9]/g, '');
+            if (cleanValue.length <= 1) {
+              const newDigits = [...digits];
+              newDigits[index] = cleanValue;
+              setDigits(newDigits);
+              if (cleanValue !== '' && index < 3) inputRefs[index + 1].current.focus();
+            }
+          };
+
+          const handleKeyDown = (index, e) => {
+            if (e.key === 'Backspace' && digits[index] === '' && index > 0) {
+              inputRefs[index - 1].current.focus();
+            }
+          };
+
+          const runDataModel = () => {
+            if (draws.length === 0) {
+              setFrequency(Array(10).fill(0));
+              setPredictions({ primaryHot: null, secondaryHot: null, coldDigit: null, setsThree: [], setsTwo: [] });
+              return;
+            }
+
+            const counts = Array(10).fill(0);
+            draws.forEach(draw => {
+              draw.digits.forEach(digit => {
+                const num = parseInt(digit, 10);
+                if (!isNaN(num) && num >= 0 && num <= 9) counts[num]++;
+              });
+            });
+            setFrequency(counts);
+
+            const recency = Array(10).fill(draws.length); 
+            for (let num = 0; num <= 9; num++) {
+              for (let i = 0; i < draws.length; i++) {
+                if (draws[i].digits.includes(num.toString())) {
+                  recency[num] = i; 
+                  break;
+                }
+              }
+            }
+
+            const sortedByFreq = [...Array(10).keys()].sort((a, b) => counts[b] - counts[a]);
+            const sortedByRecency = [...Array(10).keys()].sort((a, b) => recency[b] - recency[a]);
+
+            const primaryHot = sortedByFreq[0];
+            const secondaryHot = sortedByFreq[1];
+            const thirdHot = sortedByFreq[2];
+            const coldDigit = sortedByRecency[0];
+
+            setPredictions({
+              primaryHot, secondaryHot, coldDigit,
+              setsThree: [
+                `${primaryHot}${secondaryHot}${thirdHot}`,
+                `${primaryHot}${thirdHot}${coldDigit}`,
+                `${secondaryHot}${thirdHot}${coldDigit}`
+              ],
+              setsTwo: [
+                `${primaryHot}${secondaryHot}`,
+                `${primaryHot}${coldDigit}`,
+                `${secondaryHot}${thirdHot}`,
+                `${secondaryHot}${coldDigit}`
+              ]
+            });
+          };
+
+          const handleSave = (e) => {
+            e.preventDefault();
+            if (digits.some(d => d === '')) return showToast('กรุณากรอกเลขให้ครบ 4 หลัก', 'error');
+
+            const payload = { id: editingId || Date.now().toString(), date, digits: [...digits] };
+
+            if (editingId) {
+              setDraws(draws.map(d => d.id === editingId ? payload : d));
+              showToast('แก้ไขข้อมูลเรียบร้อย');
+              setEditingId(null);
+            } else {
+              if (draws.some(d => d.date === date)) return showToast('วันที่นี้มีข้อมูลแล้ว', 'error');
+              setDraws([payload, ...draws].sort((a, b) => new Date(b.date) - new Date(a.date)));
+              showToast('บันทึกข้อมูลสำเร็จ');
+            }
+            
+            setDigits(['', '', '', '']);
+            inputRefs[0].current.focus();
+          };
+
+          const handleEdit = (draw) => {
+            setEditingId(draw.id);
+            setDate(draw.date);
+            setDigits([...draw.digits]);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            inputRefs[0].current.focus();
+          };
+
+          const handleDelete = (id) => {
+            if (window.confirm('ยืนยันการลบข้อมูลนี้?')) {
+              setDraws(draws.filter(d => d.id !== id));
+              showToast('ลบข้อมูลเรียบร้อย');
+            }
+          };
+
+          const maxFreq = Math.max(...frequency, 1);
+
+          return (
+            <div className="min-h-screen pb-10">
+              {toast && (
+                <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-11/12 max-w-sm">
+                  <div className={`p-4 rounded-xl shadow-lg flex items-center gap-3 text-white text-sm font-medium ${toast.type === 'error' ? 'bg-rose-500' : 'bg-emerald-600'}`}>
+                    <span>{toast.message}</span>
+                  </div>
+                </div>
+              )}
+
+              <header className="bg-emerald-600 text-white shadow-sm sticky top-0 z-20">
+                <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-white text-emerald-600 p-2 rounded-lg font-bold shadow-inner">🇱🇦</div>
+                    <div>
+                      <h1 className="font-bold text-lg leading-tight">หวยลาว Data Analytics</h1>
+                      <p className="text-[10px] text-emerald-100 uppercase tracking-wider font-semibold mt-0.5">
+                        Offline Mode (Local Storage)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </header>
+
+              <main className="max-w-4xl mx-auto px-4 mt-6 grid grid-cols-1 md:grid-cols-12 gap-6">
+                <div className="md:col-span-7 space-y-6">
+                  <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="bg-emerald-50/50 border-b border-emerald-100/50 px-5 py-3.5 flex justify-between items-center">
+                      <h2 className="font-bold text-slate-700 text-sm">{editingId ? 'แก้ไขข้อมูล' : 'บันทึกสถิติใหม่'}</h2>
+                      {editingId && <button onClick={() => { setEditingId(null); setDigits(['','','','']); }} className="text-[10px] bg-rose-100 text-rose-600 px-2 py-1 rounded font-medium">ยกเลิก</button>}
+                    </div>
+                    
+                    <form onSubmit={handleSave} className="p-5 space-y-5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">วันที่ออกรางวัล</label>
+                          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-medium text-slate-700" />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">ผลรางวัล 4 หลัก</label>
+                          <div className="grid grid-cols-4 gap-2">
+                            {['พัน', 'ร้อย', 'สิบ', 'หน่วย'].map((label, idx) => (
+                              <div key={idx} className="relative">
+                                <input
+                                  ref={inputRefs[idx]} type="text" pattern="[0-9]*" inputMode="numeric" maxLength={1}
+                                  value={digits[idx]} onChange={(e) => handleDigitChange(idx, e.target.value)} onKeyDown={(e) => handleKeyDown(idx, e)}
+                                  className="w-full h-12 text-center text-xl font-bold bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:bg-white focus:border-emerald-500 outline-none transition-all text-slate-800" placeholder="-"
+                                />
+                                <span className="absolute -bottom-4 left-0 right-0 text-[10px] text-center text-slate-400">{label}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-emerald-50/40 rounded-xl p-3 border border-emerald-100/60 mt-3">
+                        <div className="grid grid-cols-3 gap-2 text-center divide-x divide-emerald-100/80">
+                          <div>
+                            <div className="text-[10px] text-slate-500 font-medium">2 ตัวล่าง (พัน+ร้อย)</div>
+                            <div className="font-bold text-emerald-700 mt-0.5">{digits[0] && digits[1] ? `${digits[0]}${digits[1]}` : '--'}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-slate-500 font-medium">3 ตัวบน (ร้อย+สิบ+หน่วย)</div>
+                            <div className="font-bold text-emerald-700 mt-0.5">{digits[1] && digits[2] && digits[3] ? `${digits[1]}${digits[2]}${digits[3]}` : '---'}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-slate-500 font-medium">2 ตัวบน (สิบ+หน่วย)</div>
+                            <div className="font-bold text-emerald-700 mt-0.5">{digits[2] && digits[3] ? `${digits[2]}${digits[3]}` : '--'}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl transition-colors text-sm shadow-sm shadow-emerald-200">
+                        {editingId ? 'อัปเดตข้อมูล' : 'บันทึกข้อมูล'}
+                      </button>
+                    </form>
+                  </section>
+
+                  <section className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+                    <h2 className="font-bold text-slate-700 text-sm mb-4">กราฟความถี่ (Frequency Analysis)</h2>
+                    {draws.length === 0 ? <div className="text-center py-6 text-sm text-slate-400 bg-slate-50 rounded-xl border border-dashed">รอข้อมูล...</div> : (
+                      <div className="space-y-2.5">
+                        {frequency.map((count, index) => (
+                          <div key={index} className="flex items-center gap-3 text-sm">
+                            <div className="w-5 font-bold text-slate-500 text-center">{index}</div>
+                            <div className="flex-1 bg-slate-100 rounded-full h-3.5 overflow-hidden">
+                              <div className="bg-gradient-to-r from-emerald-400 to-teal-400 h-full rounded-full transition-all duration-700" style={{ width: `${(count / maxFreq) * 100}%` }} />
+                            </div>
+                            <div className="w-8 text-right text-xs font-bold text-slate-600">{count}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </div>
+
+                <div className="md:col-span-5 space-y-6">
+                  <section className="bg-slate-800 text-white rounded-2xl shadow-sm p-5 relative overflow-hidden">
+                     <div className="absolute -top-10 -right-10 w-40 h-40 bg-emerald-500/20 rounded-full blur-3xl"></div>
+                    <div className="flex justify-between items-center mb-5 relative z-10">
+                      <h2 className="font-bold text-emerald-400 text-sm">Prediction Dashboard</h2>
+                      <button onClick={runDataModel} className="text-[10px] bg-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-600 transition-colors border border-slate-600">คำนวณใหม่</button>
+                    </div>
+                    {draws.length === 0 ? <div className="text-center py-8 text-sm text-slate-400 border border-slate-700 border-dashed rounded-xl relative z-10">ต้องการสถิติ 1 งวดขึ้นไป</div> : (
+                      <div className="space-y-5 relative z-10">
+                        <div className="flex justify-around bg-slate-700/40 rounded-xl p-3 border border-slate-600 text-center shadow-inner">
+                          <div><div className="text-[10px] text-slate-400 mb-1">เลขเด่น (Mode)</div><div className="text-2xl font-black text-emerald-400">{predictions.primaryHot}</div></div>
+                          <div className="w-px bg-slate-600"></div>
+                          <div><div className="text-[10px] text-slate-400 mb-1">เด่นรอง (2nd)</div><div className="text-2xl font-black text-teal-400">{predictions.secondaryHot}</div></div>
+                          <div className="w-px bg-slate-600"></div>
+                          <div><div className="text-[10px] text-slate-400 mb-1">เลขนอน (Cold)</div><div className="text-2xl font-black text-amber-400">{predictions.coldDigit}</div></div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <div className="text-[11px] font-bold text-slate-400 mb-2 border-b border-slate-700 pb-1">3 ตัวบน</div>
+                            <div className="grid gap-2">{predictions.setsThree.map((set, i) => <div key={i} className="bg-slate-700/60 text-center py-2 rounded-lg text-sm font-black tracking-widest">{set}</div>)}</div>
+                          </div>
+                          <div>
+                            <div className="text-[11px] font-bold text-slate-400 mb-2 border-b border-slate-700 pb-1">2 ตัว (บน/ล่าง)</div>
+                            <div className="grid gap-2">{predictions.setsTwo.map((set, i) => <div key={i} className="bg-slate-700/60 text-center py-2 rounded-lg text-sm font-black tracking-widest">{set}</div>)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="bg-slate-50/80 border-b border-slate-100 px-5 py-3.5"><h2 className="font-bold text-slate-700 text-sm">ประวัติข้อมูล ({draws.length})</h2></div>
+                    <div className="overflow-auto max-h-[400px]">
+                      {draws.length === 0 ? <div className="text-center py-10 text-sm text-slate-400">ยังไม่มีข้อมูล</div> : (
+                        <table className="w-full text-left text-sm">
+                          <thead className="sticky top-0 bg-slate-50 shadow-sm">
+                            <tr className="text-slate-500 text-[10px] uppercase tracking-wider">
+                              <th className="py-3 px-4 font-bold">วันที่</th>
+                              <th className="py-3 px-4 text-center font-bold">4 ตัว</th>
+                              <th className="py-3 px-4 text-center font-bold">จัดการ</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {draws.map(draw => (
+                              <tr key={draw.id} className="hover:bg-emerald-50/30 transition-colors group">
+                                <td className="py-3 px-4 text-slate-700 text-xs font-medium">{new Date(draw.date).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit' })}</td>
+                                <td className="py-3 px-4 text-center font-black tracking-widest bg-slate-50/50">{draw.digits.join('')}</td>
+                                <td className="py-3 px-4 text-center">
+                                  <button onClick={() => handleEdit(draw)} className="text-emerald-600 hover:bg-emerald-100 p-1.5 rounded mr-2">แก้ไข</button>
+                                  <button onClick={() => handleDelete(draw.id)} className="text-rose-500 hover:bg-rose-100 p-1.5 rounded">ลบ</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </section>
+                </div>
+              </main>
+            </div>
+          );
+        }
+
+        const root = banknotes = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
